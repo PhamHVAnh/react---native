@@ -1,0 +1,376 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom styles for login page */
+.login-input {
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  font-size: 14px !important;
+  transition: all 0.3s ease !important;
+}
+
+.login-input:hover {
+  border-color: #004d99 !important;
+  box-shadow: 0 0 0 2px rgba(0, 77, 153, 0.1) !important;
+}
+
+.login-input:focus,
+.login-input.ant-input-focused {
+  border-color: #004d99 !important;
+  box-shadow: 0 0 0 2px rgba(0, 77, 153, 0.2) !important;
+}
+
+.login-input.ant-input-affix-wrapper {
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  transition: all 0.3s ease !important;
+}
+
+.login-input.ant-input-affix-wrapper:hover {
+  border-color: #004d99 !important;
+  box-shadow: 0 0 0 2px rgba(0, 77, 153, 0.1) !important;
+}
+
+.login-input.ant-input-affix-wrapper:focus,
+.login-input.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  border-color: #004d99 !important;
+  box-shadow: 0 0 0 2px rgba(0, 77, 153, 0.2) !important;
+}
+
+.login-button {
+  height: 48px !important;
+  background: #004d99 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(0, 77, 153, 0.3) !important;
+  transition: all 0.3s ease !important;
+}
+
+.login-button:hover {
+  background: #003d7a !important;
+  box-shadow: 0 6px 16px rgba(0, 77, 153, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.login-button:active {
+  transform: translateY(0) !important;
+}
+
+.login-button.ant-btn-loading {
+  background: #004d99 !important;
+}
+
+
+/* Global Admin Theme - Improved Contrast */
+.ant-btn-primary {
+  background: #004d99 !important;
+  border-color: #004d99 !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:hover {
+  background: #003d7a !important;
+  border-color: #003d7a !important;
+  color: #ffffff !important;
+}
+
+.ant-menu-item-selected {
+  background-color: rgba(0, 77, 153, 0.15) !important;
+  color: #004d99 !important;
+  font-weight: 600 !important;
+}
+
+.ant-menu-item:hover {
+  background-color: rgba(0, 77, 153, 0.08) !important;
+  color: #004d99 !important;
+}
+
+/* Table Improvements */
+.ant-table-thead > tr > th {
+  background: #f8f9fa !important;
+  font-weight: 700 !important;
+  color: #1a1a1a !important;
+  border-bottom: 2px solid #e9ecef !important;
+  font-size: 14px !important;
+}
+
+.ant-table-tbody > tr > td {
+  color: #2c3e50 !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(0, 77, 153, 0.03) !important;
+  color: #1a1a1a !important;
+}
+
+/* Card Improvements */
+.ant-card {
+  border-radius: 12px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid #e9ecef !important;
+  background: #ffffff !important;
+}
+
+.ant-card-head {
+  border-bottom: 2px solid #e9ecef !important;
+  background: #ffffff !important;
+}
+
+.ant-card-head-title {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+}
+
+.ant-card-body {
+  color: #2c3e50 !important;
+}
+
+/* Form Improvements */
+.ant-form-item-label > label {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+.ant-input {
+  color: #2c3e50 !important;
+  border-color: #d9d9d9 !important;
+}
+
+.ant-input:hover {
+  border-color: #004d99 !important;
+}
+
+.ant-input:focus {
+  border-color: #004d99 !important;
+  box-shadow: 0 0 0 2px rgba(0, 77, 153, 0.2) !important;
+}
+
+.ant-input-number {
+  color: #2c3e50 !important;
+}
+
+.ant-input-number:hover {
+  border-color: #004d99 !important;
+}
+
+.ant-input-number:focus {
+  border-color: #004d99 !important;
+  box-shadow: 0 0 0 2px rgba(0, 77, 153, 0.2) !important;
+}
+
+/* Modal Improvements */
+.ant-modal-header {
+  background: #ffffff !important;
+  border-bottom: 2px solid #e9ecef !important;
+}
+
+.ant-modal-title {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+  font-size: 18px !important;
+}
+
+/* Pagination Improvements */
+.ant-pagination-item-active {
+  background: #004d99 !important;
+  border-color: #004d99 !important;
+  color: #ffffff !important;
+}
+
+.ant-pagination-item-active a {
+  color: #ffffff !important;
+}
+
+.ant-pagination-item:hover {
+  border-color: #004d99 !important;
+  color: #004d99 !important;
+}
+
+.ant-pagination-item:hover a {
+  color: #004d99 !important;
+}
+
+/* Tag Improvements */
+.ant-tag {
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+  border: 1px solid !important;
+}
+
+/* Status Colors - Better Contrast */
+.ant-tag-success {
+  background: #f6ffed !important;
+  border-color: #b7eb8f !important;
+  color: #389e0d !important;
+}
+
+.ant-tag-error {
+  background: #fff2f0 !important;
+  border-color: #ffccc7 !important;
+  color: #cf1322 !important;
+}
+
+.ant-tag-warning {
+  background: #fffbe6 !important;
+  border-color: #ffe58f !important;
+  color: #d46b08 !important;
+}
+
+.ant-tag-processing {
+  background: #e6f7ff !important;
+  border-color: #91d5ff !important;
+  color: #0050b3 !important;
+}
+
+/* Button Improvements */
+.ant-btn {
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+}
+
+.ant-btn-link {
+  color: #004d99 !important;
+  font-weight: 600 !important;
+}
+
+.ant-btn-link:hover {
+  color: #003d7a !important;
+}
+
+/* Text Improvements */
+.ant-typography {
+  color: #2c3e50 !important;
+}
+
+.ant-typography-title {
+  color: #1a1a1a !important;
+}
+
+/* Dropdown Improvements */
+.ant-dropdown-menu {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-dropdown-menu-item {
+  color: #2c3e50 !important;
+  font-weight: 500 !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: rgba(0, 77, 153, 0.08) !important;
+  color: #004d99 !important;
+}
+
+/* Sidebar Menu Improvements */
+.admin-sidebar-menu .ant-menu-item {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 500 !important;
+  margin: 4px 8px !important;
+  border-radius: 6px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+}
+
+.admin-sidebar-menu .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+.admin-sidebar-menu .ant-menu-item-selected {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-right: 3px solid #ffd700 !important;
+}
+
+.admin-sidebar-menu .ant-menu-item-icon {
+  color: inherit !important;
+  font-size: 16px !important;
+}
+
+/* Header Improvements */
+.ant-layout-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e9ecef !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Content Area Improvements */
+.ant-layout-content {
+  background: #f8f9fa !important;
+}
+
+/* Message/Notification Improvements */
+.ant-message-notice-content {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-notification-notice {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Loading Improvements */
+.ant-spin-dot {
+  color: #004d99 !important;
+}
+
+.ant-spin-text {
+  color: #2c3e50 !important;
+  font-weight: 500 !important;
+}
+
+/* Responsive design for login page */
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column !important;
+  }
+  
+  .login-branding {
+    flex: none !important;
+    height: 200px !important;
+    padding: 40px 20px !important;
+  }
+  
+  .login-form-panel {
+    flex: none !important;
+    padding: 40px 20px !important;
+  }
+  
+  .login-logo {
+    font-size: 32px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .login-subtitle {
+    font-size: 12px !important;
+  }
+}

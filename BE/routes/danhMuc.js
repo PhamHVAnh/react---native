@@ -2,6 +2,20 @@ const express = require('express');
 const router = express.Router();
 const danhMucController = require('../controllers/danhMucController');
 
+/**
+ * @swagger
+ * /api/danhmuc:
+ *   get:
+ *     tags:
+ *       - DanhMuc
+ *     summary: Lấy danh sách danh mục
+ *     description: Trả về toàn bộ danh mục sản phẩm trong hệ thống.
+ *     responses:
+ *       200:
+ *         description: Thành công - trả về danh sách danh mục
+ *       500:
+ *         description: Lỗi server
+ */
 // Get all categories
 router.get('/', danhMucController.getAllCategories);
 

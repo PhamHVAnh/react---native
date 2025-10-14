@@ -26,7 +26,6 @@ const sanPhamController = require('../controllers/sanPhamController');
  */
 router.get('/', sanPhamController.getAllSanPhams);
 
-
 /**
  * @swagger
  * /api/sanpham/search:
@@ -56,6 +55,33 @@ router.get('/search', sanPhamController.searchSanPham);
 
 /**
  * @swagger
+ * /api/sanpham/category/{categoryId}:
+ *   get:
+ *     summary: Lấy sản phẩm theo danh mục (bao gồm danh mục con)
+ *     tags: [SanPham]
+ *     parameters:
+ *       - in: path
+ *         name: categoryId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: ID của danh mục
+ *     responses:
+ *       200:
+ *         description: Danh sách sản phẩm trong danh mục và danh mục con
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/SanPham'
+ *       500:
+ *         description: Lỗi server
+ */
+router.get('/category/:categoryId', sanPhamController.getSanPhamByCategory);
+
+/**
+ * @swagger
  * /api/sanpham/{id}:
  *   get:
  *     summary: Get a product by ID
@@ -64,7 +90,8 @@ router.get('/search', sanPhamController.searchSanPham);
  *       - in: path
  *         name: id
  *         schema:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *         required: true
  *     responses:
  *       200:
@@ -105,7 +132,8 @@ router.post('/', sanPhamController.createSanPham);
  *       - in: path
  *         name: id
  *         schema:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *         required: true
  *     requestBody:
  *       required: true
@@ -131,7 +159,8 @@ router.put('/:id', sanPhamController.updateSanPham);
  *       - in: path
  *         name: id
  *         schema:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *         required: true
  *     responses:
  *       204:

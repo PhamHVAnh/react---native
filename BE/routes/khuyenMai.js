@@ -29,6 +29,15 @@ router.get('/', khuyenMaiController.getAllKhuyenMais);
 // 🆕 Route lấy danh sách mã khuyến mãi còn hiệu lực
 router.get('/active', khuyenMaiController.getActivePromotions);
 
+// 🆕 Route lấy khuyến mãi theo mã
+router.get('/code/:code', khuyenMaiController.getKhuyenMaiByCode);
+
+// 🆕 Route kiểm tra tính hợp lệ của mã khuyến mãi
+router.get('/validate/:code', khuyenMaiController.validatePromotion);
+
+// 🆕 Route áp dụng mã khuyến mãi
+router.post('/apply', khuyenMaiController.applyPromotion);
+
 /**
  * @swagger
  * /api/khuyenmai/{id}:
@@ -80,7 +89,7 @@ router.post('/', khuyenMaiController.createKhuyenMai);
  *       - in: path
  *         name: id
  *         schema:
- *           type: integer
+ *           type: string
  *         required: true
  *     requestBody:
  *       required: true

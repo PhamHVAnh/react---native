@@ -50,7 +50,31 @@ exports.getCartItems = async (req, res) => {
             'SELECT gh.*, sp.TenSanPham, sp.HinhAnh, sp.GiaGoc, sp.GiamGia FROM GioHang gh JOIN SanPham sp ON gh.SanPhamID = sp.SanPhamID WHERE gh.KhachHangID = ?',
             [khachHangID]
         );
-        res.status(200).json(cartItems);
+
+        const processedCartItems = cartItems.map(item => {
+            let hinhAnh = item.HinhAnh;
+            if (hinhAnh && typeof hinhAnh === 'string') {
+                if (hinhAnh.startsWith('[') && hinhAnh.endsWith(']')) {
+                    try {
+                        const images = JSON.parse(hinhAnh);
+                        hinhAnh = Array.isArray(images) && images.length > 0 ? images[0] : '';
+                    } catch (e) {
+                        console.error("Error parsing HinhAnh JSON in cart:", e);
+                        hinhAnh = ''; // fallback to empty string on error
+                    }
+                } 
+                // If it's a plain string (not a JSON array), it's used as is.
+            } else if (Array.isArray(hinhAnh)) {
+                // If it's already an array, take the first image
+                hinhAnh = hinhAnh.length > 0 ? hinhAnh[0] : '';
+            } else {
+                hinhAnh = ''; // Fallback for null or other types
+            }
+            item.HinhAnh = hinhAnh;
+            return item;
+        });
+
+        res.status(200).json(processedCartItems);
     } catch (err) {
         console.error("Error fetching cart items:", err);
         res.status(500).json({ message: "Failed to fetch cart items.", error: err.message });

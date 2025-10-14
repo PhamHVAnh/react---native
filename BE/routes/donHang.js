@@ -36,7 +36,7 @@ router.get('/', donHangController.getAllDonHangs);
  *       - in: path
  *         name: id
  *         schema:
- *           type: integer
+ *           type: string
  *         required: true
  *     responses:
  *       200:
@@ -48,6 +48,30 @@ router.get('/', donHangController.getAllDonHangs);
  *         summary: Order not found
  */
 router.get('/:id', donHangController.getDonHangById);
+
+/**
+ * @swagger
+ * /api/donhang/customer/{customerId}:
+ *   get:
+ *     summary: Get orders by customer ID
+ *     tags: [DonHang]
+ *     parameters:
+ *       - in: path
+ *         name: customerId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Customer UUID
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/DonHang'
+ */
+router.get('/customer/:customerId', donHangController.getDonHangsByCustomerId);
 
 /**
  * @swagger
@@ -77,7 +101,7 @@ router.post('/', donHangController.createDonHang);
  *       - in: path
  *         name: id
  *         schema:
- *           type: integer
+ *           type: string
  *         required: true
  *     requestBody:
  *       required: true
@@ -112,5 +136,28 @@ router.put('/:id', donHangController.updateDonHang);
  *         summary: Order not found
  */
 router.delete('/:id', donHangController.deleteDonHang);
+
+/**
+ * @swagger
+ * /api/donhang/{id}/cancel:
+ *   put:
+ *     summary: Cancel an order
+ *     tags: [DonHang]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Order UUID
+ *     responses:
+ *       200:
+ *         description: Order cancelled successfully
+ *       404:
+ *         description: Order not found
+ *       400:
+ *         description: Order cannot be cancelled
+ */
+router.put('/:id/cancel', donHangController.cancelDonHang);
 
 module.exports = router;
