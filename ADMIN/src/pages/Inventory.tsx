@@ -18,6 +18,8 @@ const InventoryPage: React.FC = () => {
   const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(null);
   const [newQuantity, setNewQuantity] = useState<number>(0);
   const [updating, setUpdating] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [stockForm] = Form.useForm();
 
   // Custom Quantity Input Component
@@ -314,6 +316,15 @@ const InventoryPage: React.FC = () => {
 
   const columns = [
     {
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
+    },
+    {
       title: 'Ảnh',
       dataIndex: 'HinhAnh',
       key: 'HinhAnh',
@@ -362,14 +373,14 @@ const InventoryPage: React.FC = () => {
       dataIndex: 'SoLuongTon',
       key: 'SoLuongTon',
       render: (quantity: number) => (
-        <strong style={{ 
+        <strong style={{
           fontSize: 16,
           color: quantity === 0 ? '#ff4d4f' : quantity < 10 ? '#faad14' : '#52c41a'
         }}>
           {quantity}
         </strong>
       ),
-      sorter: (a: Inventory, b: Inventory) => 
+      sorter: (a: Inventory, b: Inventory) =>
         a.SoLuongTon - b.SoLuongTon,
     },
     {
@@ -486,10 +497,15 @@ const InventoryPage: React.FC = () => {
           loading={loading}
           scroll={{ x: 1300 }}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} sản phẩm`,
             style: { marginTop: 24 },
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
           }}
           style={{
             borderRadius: '8px',
@@ -754,7 +770,7 @@ const InventoryPage: React.FC = () => {
               >
                 <Select placeholder="Chọn lý do">
                   <Select.Option value="purchase">Mua hàng từ nhà cung cấp</Select.Option>
-                  <Select.Option value="return">Trả hàng từ khách</Select.Option>
+                  {/* <Select.Option value="return">Trả hàng từ khách</Select.Option> */}
                   <Select.Option value="transfer">Chuyển kho</Select.Option>
                   <Select.Option value="adjustment">Điều chỉnh tồn kho</Select.Option>
                   <Select.Option value="damage">Hàng hỏng/mất</Select.Option>

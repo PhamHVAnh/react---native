@@ -145,16 +145,49 @@ exports.createBaoHanh = (req, res) => {
 exports.updateBaoHanh = async (req, res) => {
     try {
         const { TrangThai, GhiChu } = req.body;
+        const { id: baoHanhID } = req.params;
+        
+        // Xác thực quyền sở hữu trước khi cho phép cập nhật
+        const ownershipQuery = `
+            SELECT bh.KhachHangID, nd.SoDienThoai, nd.Email
+            FROM BaoHanh bh
+            JOIN NguoiDung nd ON bh.KhachHangID = nd.UserID
+            WHERE bh.BaoHanhID = ?
+        `;
+        
+        const ownershipResult = await db.query(ownershipQuery, [baoHanhID]);
+        
+        if (ownershipResult.length === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy bảo hành' });
+        }
+        
+        // Kiểm tra xác thực quyền sở hữu
+        const { soDienThoai, email } = req.query;
+        const warrantyOwner = ownershipResult[0];
+        
+        // Chỉ cho phép cập nhật nếu thông tin khách hàng khớp
+        if (soDienThoai && warrantyOwner.SoDienThoai !== soDienThoai) {
+            return res.status(403).json({ 
+                error: 'Bạn không có quyền cập nhật bảo hành này. Vui lòng sử dụng thông tin khách hàng chính xác.' 
+            });
+        }
+        
+        if (email && warrantyOwner.Email !== email) {
+            return res.status(403).json({ 
+                error: 'Bạn không có quyền cập nhật bảo hành này. Vui lòng sử dụng thông tin khách hàng chính xác.' 
+            });
+        }
+
         const updateData = { TrangThai, GhiChu };
 
-        const results = await db.query('UPDATE BaoHanh SET ? WHERE BaoHanhID = ?', [updateData, req.params.id]);
+        const results = await db.query('UPDATE BaoHanh SET ? WHERE BaoHanhID = ?', [updateData, baoHanhID]);
 
         if (results.affectedRows === 0) {
             return res.status(404).json({ error: 'Không tìm thấy bảo hành để cập nhật' });
         }
 
         // Fetch the full, updated warranty details and return them
-        const updatedWarranty = await getDetailedWarrantyById(req.params.id);
+        const updatedWarranty = await getDetailedWarrantyById(baoHanhID);
         res.json(updatedWarranty);
 
     } catch (err) {
@@ -218,6 +251,15 @@ exports.getBaoHanhByCustomer = async (req, res) => {
             return res.status(400).json({ error: 'Vui lòng cung cấp số điện thoại hoặc email' });
         }
         
+        // Thêm validation để đảm bảo thông tin hợp lệ
+        if (soDienThoai && soDienThoai.length < 10) {
+            return res.status(400).json({ error: 'Số điện thoại không hợp lệ' });
+        }
+        
+        if (email && !email.includes('@')) {
+            return res.status(400).json({ error: 'Email không hợp lệ' });
+        }
+        
         let whereClause = '';
         let params = [];
         
@@ -260,7 +302,11 @@ exports.getBaoHanhByCustomer = async (req, res) => {
             ORDER BY bh.NgayMua DESC
         `;
         
+        console.log('Executing warranty query:', query);
+        console.log('Query params:', params);
+        
         const results = await db.query(query, params);
+        console.log('Raw warranty results:', results);
         
         // Process images to get first image if it's an array
         const processedResults = results.map(warranty => {
@@ -280,10 +326,43 @@ exports.getBaoHanhByCustomer = async (req, res) => {
             return warranty;
         });
         
+        console.log('Processed warranty results:', processedResults);
         res.json(processedResults);
     } catch (error) {
         console.error('Error in getBaoHanhByCustomer:', error);
         res.status(500).json({ error: 'Lỗi server khi tra cứu bảo hành' });
+    }
+};
+
+// Test endpoint to check warranty data
+exports.testWarrantyData = async (req, res) => {
+    try {
+        const testQuery = `
+            SELECT 
+                bh.BaoHanhID,
+                bh.NgayMua,
+                bh.HanBaoHanh,
+                bh.TrangThai,
+                sp.TenSanPham,
+                nd.HoTen,
+                nd.SoDienThoai,
+                nd.Email
+            FROM BaoHanh bh
+            JOIN SanPham sp ON bh.SanPhamID = sp.SanPhamID
+            JOIN NguoiDung nd ON bh.KhachHangID = nd.UserID
+            LIMIT 5
+        `;
+        
+        const results = await db.query(testQuery);
+        console.log('Test warranty data:', results);
+        res.json({ 
+            message: 'Test warranty data', 
+            count: results.length, 
+            data: results 
+        });
+    } catch (error) {
+        console.error('Error in testWarrantyData:', error);
+        res.status(500).json({ error: 'Lỗi server khi test dữ liệu bảo hành' });
     }
 };
 

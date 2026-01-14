@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Form, Input, InputNumber, Select, Button, message, Card, Row, Col, Space, Divider, Tag, Upload, Image } from 'antd';
+import { Form, Input, InputNumber, Select, Button, message, Card, Row, Col, Space, Divider, Tag, Upload, Image, TreeSelect } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { productService } from '../services/productService';
-import type { CreateProductDto } from '../services/productService';
+import type { CreateProductDto, Product } from '../services/productService';
 import { categoryService } from '../services/categoryService';
 import type { Category } from '../services/categoryService';
 import { getAttributeTemplate } from '../utils/productAttributes';
@@ -20,44 +20,96 @@ const ProductForm: React.FC = () => {
   const [attributeFields, setAttributeFields] = useState<AttributeField[]>([]);
   const [images, setImages] = useState<string[]>(['']);
   const [uploading, setUploading] = useState(false);
+  const [formLoaded, setFormLoaded] = useState(false);
+  const [productLoaded, setProductLoaded] = useState(false);
+  const [storedProductData, setStoredProductData] = useState<Product | null>(null);
+  const [categoryTreeData, setCategoryTreeData] = useState<CategoryNode[]>([]);
 
   const isEditMode = !!id;
 
-  const loadCategories = async () => {
+  interface CategoryNode extends Category {
+    children: CategoryNode[];
+  }
+
+  const buildCategoryTree = useCallback((categories: Category[]): CategoryNode[] => {
+    const categoryMap = new Map<string, CategoryNode>();
+    const roots: CategoryNode[] = [];
+
+    // First pass: create map of all categories
+    categories.forEach(cat => {
+      categoryMap.set(cat.DanhMucID, { 
+        ...cat, 
+        children: []
+      });
+    });
+
+    // Second pass: build tree
+    categories.forEach(cat => {
+      const node = categoryMap.get(cat.DanhMucID)!;
+      if (cat.ParentID && categoryMap.has(cat.ParentID)) {
+        const parent = categoryMap.get(cat.ParentID)!;
+        if (!parent.children) parent.children = [];
+        parent.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    console.log('🌳 Built category tree:', roots);
+    return roots;
+  }, []);
+
+  const loadCategories = useCallback(async () => {
     try {
       const response = await categoryService.getAll();
       setCategories(response.data);
+      
+      // Build tree structure for categories
+      const treeData = buildCategoryTree(response.data);
+      setCategoryTreeData(treeData);
     } catch {
       message.error('Không thể tải danh sách danh mục');
     }
+  }, [buildCategoryTree]);
+
+  interface TreeSelectNode {
+    title: string;
+    value: string;
+    key: string;
+    children?: TreeSelectNode[];
+  }
+
+  const convertToTreeSelectData = (treeData: CategoryNode[]): TreeSelectNode[] => {
+    const result = treeData.map(node => ({
+      title: node.TenDanhMuc,
+      value: node.DanhMucID,
+      key: node.DanhMucID,
+      children: node.children && node.children.length > 0 
+        ? convertToTreeSelectData(node.children)
+        : undefined
+    }));
+    
+    console.log('🌳 TreeSelect data:', result);
+    return result;
   };
 
   const loadProduct = useCallback(async () => {
-    if (!id) return;
+    if (!id || !categories.length) return;
     setLoading(true);
     try {
       const response = await productService.getById(id);
       const product = response.data;
       
-      // Set form values
-      form.setFieldsValue({
-        TenSanPham: product.TenSanPham,
-        DanhMucID: product.DanhMucID,
-        Model: product.Model,
-        ThuongHieu: product.ThuongHieu,
-        MoTa: product.MoTa,
-        GiaGoc: product.GiaGoc,
-        GiamGia: product.GiamGia,
-        BaoHanhThang: product.BaoHanhThang,
-        ...product.ThuocTinh,
-      });
-
-      // Set images
-      if (product.HinhAnh && Array.isArray(product.HinhAnh)) {
-        setImages(product.HinhAnh.length > 0 ? product.HinhAnh : ['']);
-      }
-
-      // Set category and load attributes
+      // Store product data for later use
+      setStoredProductData(product);
+      
+      console.log('📦 Product data loaded:', product);
+      console.log('🔧 Product attributes:', product.ThuocTinh);
+      
+      // Clear form first to remove any old data
+      form.resetFields();
+      
+      // Set category and load attributes FIRST
       if (product.DanhMucID) {
         setSelectedCategory(product.DanhMucID);
         const category = categories.find(c => c.DanhMucID === product.DanhMucID);
@@ -66,6 +118,8 @@ const ProductForm: React.FC = () => {
           const template = getAttributeTemplate(category.TenDanhMuc);
           setAttributeFields(template);
           
+          console.log('📋 Template loaded:', template);
+          
           if (template.length > 0) {
             message.success(`Đã tải ${template.length} trường thuộc tính cho "${category.TenDanhMuc}"`);
           } else {
@@ -73,19 +127,88 @@ const ProductForm: React.FC = () => {
           }
         }
       }
-    } catch {
+
+      // Set images
+      if (product.HinhAnh && Array.isArray(product.HinhAnh)) {
+        setImages(product.HinhAnh.length > 0 ? product.HinhAnh : ['']);
+      }
+
+      // Set form values with proper handling for empty values
+      const formValues = {
+        TenSanPham: product.TenSanPham || '',
+        DanhMucID: product.DanhMucID || undefined,
+        Model: product.Model || '',
+        ThuongHieu: product.ThuongHieu || '',
+        MoTa: product.MoTa || '',
+        GiaGoc: product.GiaGoc || 0,
+        GiamGia: product.GiamGia || 0,
+        BaoHanhThang: product.BaoHanhThang || 12,
+        ...product.ThuocTinh,
+      };
+      
+      console.log('📝 Form values to set:', formValues);
+      
+      // Use setTimeout to ensure attribute fields are loaded before setting values
+      setTimeout(() => {
+        form.setFieldsValue(formValues);
+        console.log('✅ Form values set successfully');
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error loading product:', error);
       message.error('Không thể tải thông tin sản phẩm');
     } finally {
       setLoading(false);
+      setFormLoaded(true);
     }
   }, [id, form, categories]);
 
   useEffect(() => {
     loadCategories();
-    if (isEditMode) {
+  }, [loadCategories]);
+
+  useEffect(() => {
+    if (isEditMode && categories.length > 0 && !productLoaded) {
       loadProduct();
+      setProductLoaded(true);
     }
-  }, [id, isEditMode, loadProduct]);
+  }, [isEditMode, categories.length, productLoaded, loadProduct]);
+
+  // Re-set form values when attribute fields change (for edit mode)
+  useEffect(() => {
+    if (isEditMode && attributeFields.length > 0 && formLoaded && storedProductData) {
+      console.log('🔄 Attribute fields changed, re-setting form values');
+      console.log('🔧 Using stored product attributes:', storedProductData.ThuocTinh);
+      
+      if (storedProductData.ThuocTinh && Object.keys(storedProductData.ThuocTinh).length > 0) {
+        // Set only the attribute values
+        const attributeValues: Record<string, string | number | boolean> = {};
+        
+        // Map database field names (Vietnamese) to template field names (English)
+        attributeFields.forEach(field => {
+          // Find matching database field by label
+          const dbFieldName = Object.keys(storedProductData.ThuocTinh || {}).find(dbKey => {
+            // Try to match by label or by similar name
+            return dbKey === field.label || 
+                   dbKey.toLowerCase().includes(field.label.toLowerCase()) ||
+                   field.label.toLowerCase().includes(dbKey.toLowerCase());
+          });
+          
+          if (dbFieldName && storedProductData.ThuocTinh && storedProductData.ThuocTinh[dbFieldName] !== undefined) {
+            attributeValues[field.name] = storedProductData.ThuocTinh[dbFieldName];
+            console.log(`🔄 Mapped: ${dbFieldName} (${storedProductData.ThuocTinh[dbFieldName]}) -> ${field.name}`);
+          }
+        });
+        
+        console.log('📝 Setting attribute values:', attributeValues);
+        
+        setTimeout(() => {
+          form.setFieldsValue(attributeValues);
+          console.log('✅ Attribute values set successfully');
+        }, 100);
+      }
+    }
+  }, [attributeFields, isEditMode, formLoaded, storedProductData, form]);
 
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
@@ -114,6 +237,8 @@ const ProductForm: React.FC = () => {
       setImages(newImages);
     }
   };
+
+
 
   const handleImageUpload = async (files: File[]) => {
     setUploading(true);
@@ -149,11 +274,12 @@ const ProductForm: React.FC = () => {
       // Tách các thuộc tính cơ bản và thuộc tính động
       const { TenSanPham, DanhMucID, Model, ThuongHieu, MoTa, GiaGoc, GiamGia, BaoHanhThang, ...attributes } = values;
 
-      // Lọc attributes để chỉ giữ những field có trong template
+      // Lọc attributes để chỉ giữ những field có trong template và có giá trị
       const filteredAttributes: Record<string, unknown> = {};
       attributeFields.forEach(field => {
-        if (attributes[field.name] !== undefined && attributes[field.name] !== '') {
-          filteredAttributes[field.name] = attributes[field.name];
+        const value = attributes[field.name];
+        if (value !== undefined && value !== '' && value !== null && value !== 0) {
+          filteredAttributes[field.name] = value;
         }
       });
 
@@ -208,7 +334,14 @@ const ProductForm: React.FC = () => {
         );
       case 'select':
         return (
-          <Select {...commonProps} placeholder={`Chọn ${field.label.toLowerCase()}`}>
+          <Select 
+            {...commonProps} 
+            placeholder={`Chọn ${field.label.toLowerCase()}`}
+            showSearch
+            filterOption={(input, option) =>
+              String(option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          >
             {field.options?.map(option => (
               <Select.Option key={option} value={option}>
                 {option}
@@ -221,6 +354,7 @@ const ProductForm: React.FC = () => {
           <Input.TextArea
             rows={3}
             placeholder={field.placeholder}
+            style={{ width: '100%' }}
           />
         );
       default:
@@ -228,6 +362,7 @@ const ProductForm: React.FC = () => {
           <Input
             placeholder={field.placeholder}
             addonAfter={field.unit}
+            style={{ width: '100%' }}
           />
         );
     }
@@ -273,21 +408,17 @@ const ProductForm: React.FC = () => {
                     label="Danh mục"
                     rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
                   >
-                    <Select
+                    <TreeSelect
                       size="large"
                       placeholder="Chọn danh mục"
                       onChange={handleCategoryChange}
                       showSearch
-                      filterOption={(input, option) =>
-                        String(option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                    >
-                      {categories.map(cat => (
-                        <Select.Option key={cat.DanhMucID} value={cat.DanhMucID}>
-                          {cat.TenDanhMuc}
-                        </Select.Option>
-                      ))}
-                    </Select>
+                      treeDefaultExpandAll={true}
+                      allowClear
+                      treeData={convertToTreeSelectData(categoryTreeData)}
+                      treeNodeFilterProp="title"
+                      style={{ width: '100%' }}
+                    />
                   </Form.Item>
                 </Col>
 
@@ -330,7 +461,10 @@ const ProductForm: React.FC = () => {
                 <Row gutter={16}>
                   {attributeFields.map(field => (
                     <Col xs={24} md={12} key={field.name}>
-                      <Form.Item name={field.name} label={field.label}>
+                      <Form.Item 
+                        name={field.name} 
+                        label={field.label}
+                      >
                         {renderAttributeField(field)}
                       </Form.Item>
                     </Col>
@@ -380,9 +514,10 @@ const ProductForm: React.FC = () => {
                 <InputNumber
                   style={{ width: '100%' }}
                   size="large"
-                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={value => value!.replace(/\$\s?|(,*)/g, '')}
-                  addonAfter="₫"
+                  min={0}
+                  max={100}
+                  addonAfter="%"
+                  placeholder="Nhập phần trăm giảm giá"
                 />
               </Form.Item>
 
@@ -440,9 +575,8 @@ const ProductForm: React.FC = () => {
                     {images
                       .filter(img => img && img.trim() !== '')
                       .map((img, index) => {
-                        const actualIndex = images.findIndex(i => i === img);
                         return (
-                          <div key={actualIndex} style={{ 
+                          <div key={`image-${index}-${img}`} style={{ 
                             border: '1px solid #d9d9d9', 
                             borderRadius: 8, 
                             padding: 12,
@@ -453,7 +587,7 @@ const ProductForm: React.FC = () => {
                               <Button 
                                 danger 
                                 size="small" 
-                                onClick={() => removeImageField(actualIndex)}
+                                onClick={() => removeImageField(index)}
                                 style={{ minWidth: 'auto', padding: '2px 8px' }}
                               >
                                 ×
@@ -504,6 +638,7 @@ const ProductForm: React.FC = () => {
             type="primary"
             htmlType="submit"
             loading={loading}
+            disabled={!formLoaded && isEditMode}
             icon={<SaveOutlined />}
             size="large"
           >

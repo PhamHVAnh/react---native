@@ -16,6 +16,8 @@ const Users: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [currentFilters, setCurrentFilters] = useState<Record<string, unknown>>({});
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
 
   // Use search hook
@@ -178,6 +180,15 @@ const Users: React.FC = () => {
 
   const columns = [
     {
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
+    },
+    {
       title: 'Avatar',
       dataIndex: 'HinhAnh',
       key: 'HinhAnh',
@@ -324,10 +335,15 @@ const Users: React.FC = () => {
           rowKey="UserID"
           loading={loading}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} người dùng`,
             style: { marginTop: 24 },
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
           }}
           style={{
             borderRadius: '8px',

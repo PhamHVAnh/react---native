@@ -26,6 +26,8 @@ const Categories: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [, setCurrentFilters] = useState<Record<string, unknown>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [form] = Form.useForm();
 
   // Use search hook
@@ -147,6 +149,15 @@ const Categories: React.FC = () => {
 
   const columns = [
     {
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
+    },
+    {
       title: 'Tên danh mục',
       dataIndex: 'TenDanhMuc',
       key: 'TenDanhMuc',
@@ -235,9 +246,9 @@ const Categories: React.FC = () => {
               <ThunderboltOutlined style={{ color: '#004d99', fontSize: 16 }} />
               <span style={{ fontSize: 18, fontWeight: '600' }}>Danh sách danh mục</span>
             </div>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
               onClick={handleAdd}
               style={{
                 background: '#004d99',
@@ -275,8 +286,8 @@ const Categories: React.FC = () => {
                 return expanded ? (
                   <CaretDownFilled
                     onClick={(e) => onExpand(record, e)}
-                    style={{ 
-                      cursor: 'pointer', 
+                    style={{
+                      cursor: 'pointer',
                       marginRight: 8,
                       color: '#004d99',
                       fontSize: 14
@@ -285,8 +296,8 @@ const Categories: React.FC = () => {
                 ) : (
                   <CaretRightFilled
                     onClick={(e) => onExpand(record, e)}
-                    style={{ 
-                      cursor: 'pointer', 
+                    style={{
+                      cursor: 'pointer',
                       marginRight: 8,
                       color: '#999',
                       fontSize: 14
@@ -298,10 +309,15 @@ const Categories: React.FC = () => {
             },
           }}
           pagination={{
-            pageSize: 20,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} danh mục`,
             style: { marginTop: 24 },
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 20);
+            },
           }}
           style={{
             borderRadius: '8px',
@@ -332,13 +348,13 @@ const Categories: React.FC = () => {
             <Input.TextArea rows={3} />
           </Form.Item>
 
-          <Form.Item 
-            name="ParentID" 
+          <Form.Item
+            name="ParentID"
             label="Danh mục cha"
             tooltip="Để trống nếu đây là danh mục chính"
           >
-            <Select 
-              allowClear 
+            <Select
+              allowClear
               placeholder="Chọn danh mục cha (để trống nếu là danh mục chính)"
               showSearch
               filterOption={(input, option) =>
@@ -346,8 +362,8 @@ const Categories: React.FC = () => {
               }
             >
               {parentCategories.map(cat => (
-                <Select.Option 
-                  key={cat.DanhMucID} 
+                <Select.Option
+                  key={cat.DanhMucID}
                   value={cat.DanhMucID}
                   label={cat.TenDanhMuc}
                   disabled={editingCategory?.DanhMucID === cat.DanhMucID}

@@ -1,9 +1,0 @@
-{
-  "devDependencies": {
-    "eslint-import-resolver-typescript": "^4.4.4"
-  },
-  "dependencies": {
-    "multer": "^2.0.2",
-    "uuid": "^13.0.0"
-  }
-}

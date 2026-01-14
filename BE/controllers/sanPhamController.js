@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 exports.getAllSanPhams = async (req, res) => {
     try {
         const query = `
-            SELECT sp.*, tk.SoLuongTon
+            SELECT sp.*, COALESCE(tk.SoLuongTon, 0) as SoLuongTon
             FROM SanPham sp
             LEFT JOIN TonKho tk ON sp.SanPhamID = tk.SanPhamID
             ORDER BY sp.SanPhamID DESC
@@ -42,7 +42,7 @@ exports.getAllSanPhams = async (req, res) => {
 exports.getSanPhamById = async (req, res) => {
     try {
         const query = `
-            SELECT sp.*, tk.SoLuongTon
+            SELECT sp.*, COALESCE(tk.SoLuongTon, 0) as SoLuongTon
             FROM SanPham sp
             LEFT JOIN TonKho tk ON sp.SanPhamID = tk.SanPhamID
             WHERE sp.SanPhamID = ?
@@ -123,7 +123,11 @@ exports.updateSanPham = async (req, res) => {
         if (results.affectedRows === 0) {
             return res.status(404).send('SanPham not found');
         }
+        
+        // Return the updated product data with proper formatting
         const updatedSanPham = { SanPhamID: req.params.id, ...req.body };
+        
+        // Parse HinhAnh if it's a JSON string
         if (updatedSanPham.HinhAnh && typeof updatedSanPham.HinhAnh === 'string') {
             if (updatedSanPham.HinhAnh.startsWith('[') && updatedSanPham.HinhAnh.endsWith(']')) {
                 try {
@@ -135,9 +139,20 @@ exports.updateSanPham = async (req, res) => {
                 updatedSanPham.HinhAnh = [updatedSanPham.HinhAnh];
             }
         }
+        
+        // Parse ThuocTinh if it's a JSON string
+        if (updatedSanPham.ThuocTinh && typeof updatedSanPham.ThuocTinh === 'string') {
+            try {
+                updatedSanPham.ThuocTinh = JSON.parse(updatedSanPham.ThuocTinh);
+            } catch (e) {
+                console.error("Error parsing ThuocTinh JSON:", e);
+            }
+        }
+        
         res.json(updatedSanPham);
     } catch (err) {
-        res.status(500).send(err);
+        console.error("Error updating product:", err);
+        res.status(500).json({ error: err.message });
     }
 };
 
@@ -164,7 +179,7 @@ exports.searchSanPham = async (req, res) => {
     }
 
     const query = `
-        SELECT sp.*, tk.SoLuongTon
+        SELECT sp.*, COALESCE(tk.SoLuongTon, 0) as SoLuongTon
         FROM SanPham sp
         LEFT JOIN TonKho tk ON sp.SanPhamID = tk.SanPhamID
         WHERE LOWER(sp.TenSanPham) LIKE ?
@@ -226,15 +241,13 @@ exports.getSanPhamByCategory = async (req, res) => {
         // Create placeholders for the IN clause
         const placeholders = categoryIds.map(() => '?').join(',');
         const query = `
-            SELECT sp.*, tk.SoLuongTon
+            SELECT sp.*, COALESCE(tk.SoLuongTon, 0) as SoLuongTon
             FROM SanPham sp
             LEFT JOIN TonKho tk ON sp.SanPhamID = tk.SanPhamID
             WHERE sp.DanhMucID IN (${placeholders})
             ORDER BY sp.SanPhamID DESC
         `;
         
-        console.log("Executing category query:", query);
-        console.log("Category IDs:", categoryIds);
         
         const results = await db.query(query, categoryIds);
         
@@ -260,7 +273,7 @@ exports.getSanPhamByCategory = async (req, res) => {
             return sp;
         });
 
-        console.log("Found", sanPhams.length, "products in category and subcategories");
+        // console.log("Found", sanPhams.length, "products in category and subcategories");
         res.json(sanPhams);
     } catch (err) {
         console.error("Error getting products by category:", err);

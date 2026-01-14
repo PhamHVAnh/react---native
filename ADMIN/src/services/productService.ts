@@ -16,6 +16,8 @@ export interface Product {
   NgayTao?: string;
   // Converted field (added by frontend)
   TenDanhMuc?: string;
+  // Stock quantity
+  SoLuongTon?: number;
 }
 
 export interface CreateProductDto {

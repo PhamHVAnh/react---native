@@ -1,5 +1,6 @@
 const db = require('../db');
 const { v4: uuidv4 } = require('uuid');
+const emailService = require('../services/emailService');
 
 exports.getAllDonHangs = async (req, res) => {
     try {
@@ -116,6 +117,9 @@ exports.createDonHang = async (req, res) => {
     let connection = null;
 
     try {
+        console.log('Creating order with data:', JSON.stringify(req.body, null, 2));
+        console.log('Payment method:', req.body.phuongThucThanhToan);
+        
         // Get connection from pool
         connection = await new Promise((resolve, reject) => {
             db.pool.getConnection((err, conn) => {
@@ -170,13 +174,15 @@ exports.createDonHang = async (req, res) => {
             DonHangID: donHangId,
             KhachHangID: req.body.khachHangId,
             TongTien: req.body.tongTien,
-            TrangThai: 'ChuaXuLy', // Default status
-            PhuongThucThanhToan: req.body.phuongThucThanhToan || 'COD', // Default to COD
+            TrangThai: req.body.trangThai || 'ChuaXuLy', // Use provided status or default
+            PhuongThucThanhToan: req.body.phuongThucThanhToan || 'COD', // Hỗ trợ: COD, CARD, QR
             GiamGia: req.body.giaTriKhuyenMai || 0
         };
 
         // Calculate ThanhTien (final amount after discount)
         donHangData.ThanhTien = donHangData.TongTien - (donHangData.GiamGia || 0);
+        
+        console.log('Creating order with payment method:', donHangData.PhuongThucThanhToan);
 
         // Insert order
         await new Promise((resolve, reject) => {
@@ -229,13 +235,204 @@ exports.createDonHang = async (req, res) => {
         // Release connection
         connection.release();
 
+        // Gửi email hóa đơn bất đồng bộ để không block response
+        const customerEmail = req.body.email || req.body.userEmail;
+        console.log('=== COD EMAIL DEBUG ===');
+        console.log('Customer email:', customerEmail);
+        console.log('Order ID:', donHangId);
+        console.log('Customer ID:', req.body.khachHangId);
+        console.log('========================');
+        
+        if (customerEmail) {
+            // Gửi email bất đồng bộ để không block response
+            setImmediate(async () => {
+                try {
+                    // Lấy thông tin chi tiết đơn hàng để gửi email
+                    const orderRowsResult = await db.query(
+                        `SELECT dh.*, nd.HoTen, nd.SoDienThoai, nd.DiaChi, nd.Email as UserEmail,
+                                ct.*, sp.TenSanPham, sp.HinhAnh 
+                         FROM DonHang dh
+                         LEFT JOIN NguoiDung nd ON dh.KhachHangID = nd.UserID
+                         LEFT JOIN ChiTietDonHang ct ON dh.DonHangID = ct.DonHangID
+                         LEFT JOIN SanPham sp ON ct.SanPhamID = sp.SanPhamID
+                         WHERE dh.DonHangID = ?
+                         ORDER BY ct.ChiTietID`,
+                        [donHangId]
+                    );
+
+                    // Xử lý kết quả query đúng cách - orderRowsResult là array của rows
+                    const orderRows = orderRowsResult;
+                    console.log('Order rows found:', orderRows.length);
+                    
+                    // Nếu không tìm thấy đơn hàng, thử lấy thông tin từ request
+                    if (orderRows.length === 0) {
+                        console.log('No order found in database, using request data');
+                        
+                        const orderData = {
+                            DonHangID: donHangId,
+                            maDonHang: `DH${donHangId}`,
+                            hoTen: req.body.hoTen || 'Khách hàng',
+                            soDienThoai: req.body.soDienThoai || 'N/A',
+                            diaChi: req.body.diaChi || 'N/A',
+                            email: customerEmail,
+                            tongTien: req.body.tongTien || 0,
+                            phiVanChuyen: 0, // Miễn phí vận chuyển
+                            giaTriKhuyenMai: req.body.giaTriKhuyenMai || 0,
+                            ngayDat: new Date(),
+                            phuongThucThanhToan: req.body.phuongThucThanhToan || 'COD',
+                            chiTiet: (req.body.chiTiet || []).map(item => ({
+                                tenSanPham: item.tenSanPham || 'Sản phẩm',
+                                soLuong: item.soLuong || 1,
+                                donGia: item.donGia || 0,
+                                thanhTien: (item.soLuong || 1) * (item.donGia || 0)
+                            }))
+                        };
+
+                        const paymentData = {
+                            method: 'Thanh toán khi nhận hàng (COD)',
+                            status: 'Chưa thanh toán',
+                            isPaid: false,
+                            transactionRef: `COD_${donHangId}`,
+                            cardInfo: null
+                        };
+
+                        console.log('Sending COD invoice email with request data to:', customerEmail);
+                        const emailResult = await emailService.sendInvoiceEmail(
+                            orderData, 
+                            paymentData,
+                            customerEmail
+                        );
+                        console.log('COD invoice email result:', emailResult);
+                    } else if (orderRows.length > 0) {
+                        // Ưu tiên thông tin từ request nếu có, fallback về database
+                        const orderData = {
+                            DonHangID: orderRows[0].DonHangID,
+                            maDonHang: `DH${orderRows[0].DonHangID}`,
+                            hoTen: req.body.hoTen || orderRows[0].HoTen || 'Khách hàng',
+                            soDienThoai: req.body.soDienThoai || orderRows[0].SoDienThoai || 'N/A',
+                            diaChi: req.body.diaChi || orderRows[0].DiaChi || 'N/A',
+                            email: customerEmail || orderRows[0].UserEmail,
+                            tongTien: orderRows[0].TongTien || 0,
+                            phiVanChuyen: 0, // Miễn phí vận chuyển
+                            giaTriKhuyenMai: orderRows[0].GiamGia || 0,
+                            ngayDat: orderRows[0].NgayDat,
+                            phuongThucThanhToan: orderRows[0].PhuongThucThanhToan || 'COD',
+                            chiTiet: orderRows.map(row => ({
+                                tenSanPham: row.TenSanPham || 'Sản phẩm',
+                                soLuong: row.SoLuong || 1,
+                                donGia: row.Gia || 0,
+                                thanhTien: (row.SoLuong || 1) * (row.Gia || 0)
+                            }))
+                        };
+
+                        // Determine payment method display text and status
+                        let paymentMethod = 'Thanh toán khi nhận hàng (COD)';
+                        let paymentStatus = 'Chưa thanh toán';
+                        let isPaid = false;
+                        
+                        // Lấy trạng thái thanh toán thực tế từ bảng PaymentTransactions
+                        let actualPaymentStatus = null;
+                        let transactionRef = `${orderRows[0].PhuongThucThanhToan}_${donHangId}`;
+                        
+                        try {
+                            const paymentResult = await db.query(
+                                `SELECT Status, TransactionRef FROM PaymentTransactions WHERE OrderID = ? ORDER BY CreatedAt DESC LIMIT 1`,
+                                [donHangId]
+                            );
+                            
+                            console.log('=== PAYMENT STATUS DEBUG ===');
+                            console.log('OrderID:', donHangId);
+                            console.log('Payment result:', paymentResult);
+                            
+                            if (paymentResult && paymentResult.length > 0) {
+                                actualPaymentStatus = paymentResult[0].Status;
+                                transactionRef = paymentResult[0].TransactionRef || transactionRef;
+                                console.log('Actual payment status:', actualPaymentStatus);
+                                console.log('Transaction ref:', transactionRef);
+                            } else {
+                                console.log('No payment record found for order:', donHangId);
+                            }
+                            console.log('========================');
+                        } catch (error) {
+                            console.error('Error fetching payment status:', error);
+                        }
+                        
+                        if (orderRows[0].PhuongThucThanhToan === 'CARD') {
+                            paymentMethod = 'Thanh toán bằng thẻ';
+                            paymentStatus = actualPaymentStatus === 'SUCCESS' ? 'Thành công' : 
+                                          actualPaymentStatus === 'PENDING' ? 'Chưa xử lý' :
+                                          actualPaymentStatus === 'FAILED' ? 'Thất bại' :
+                                          actualPaymentStatus === 'CANCELLED' ? 'Đã hủy' : 'Thành công';
+                            isPaid = actualPaymentStatus === 'SUCCESS';
+                        } else if (orderRows[0].PhuongThucThanhToan === 'QR') {
+                            paymentMethod = 'Chuyển khoản ngân hàng - VietQR';
+                            paymentStatus = actualPaymentStatus === 'SUCCESS' ? 'Thành công' : 
+                                          actualPaymentStatus === 'PENDING' ? 'Chưa xử lý' :
+                                          actualPaymentStatus === 'FAILED' ? 'Thất bại' :
+                                          actualPaymentStatus === 'CANCELLED' ? 'Đã hủy' : 'Chưa xử lý';
+                            isPaid = actualPaymentStatus === 'SUCCESS';
+                        } else if (orderRows[0].PhuongThucThanhToan === 'MOMO') {
+                            paymentMethod = 'Ví điện tử MoMo';
+                            paymentStatus = actualPaymentStatus === 'SUCCESS' ? 'Thành công' : 
+                                          actualPaymentStatus === 'PENDING' ? 'Chưa xử lý' :
+                                          actualPaymentStatus === 'FAILED' ? 'Thất bại' :
+                                          actualPaymentStatus === 'CANCELLED' ? 'Đã hủy' : 'Thành công';
+                            isPaid = actualPaymentStatus === 'SUCCESS';
+                        }
+                        
+                        console.log('=== PAYMENT MAPPING DEBUG ===');
+                        console.log('Payment method:', paymentMethod);
+                        console.log('Payment status:', paymentStatus);
+                        console.log('Is paid:', isPaid);
+                        console.log('==============================');
+                        
+                        const paymentData = {
+                            method: paymentMethod,
+                            status: paymentStatus,
+                            isPaid: isPaid,
+                            transactionRef: transactionRef,
+                            cardInfo: orderRows[0].PhuongThucThanhToan === 'CARD' ? {
+                                type: 'Card',
+                                last4: '****'
+                            } : null
+                        };
+
+                        // Gửi email hóa đơn (cho cả COD và các phương thức khác)
+                        const emailToSend = customerEmail || orderRows[0].UserEmail;
+                        console.log('Attempting to send invoice email to:', emailToSend);
+                        
+                        if (!emailToSend) {
+                            console.error('No customer email found for order:', donHangId);
+                        } else {
+                            const emailResult = await emailService.sendInvoiceEmail(
+                                orderData, 
+                                paymentData,
+                                emailToSend
+                            );
+                            console.log('Order invoice email result:', emailResult);
+                        }
+                    }
+                } catch (emailError) {
+                    console.error('Error sending order invoice email:', emailError);
+                    // Không throw error để không ảnh hưởng đến việc tạo đơn hàng
+                }
+            });
+        }
+
         res.status(201).json({
             DonHangID: donHangId,
-            message: 'Đơn hàng đã được tạo thành công'
+            message: 'Đơn hàng đã được tạo thành công và email hóa đơn đã được gửi'
         });
 
     } catch (error) {
         console.error('Error creating order:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            errno: error.errno,
+            sqlState: error.sqlState
+        });
 
         // Rollback transaction and release connection
         if (connection) {
@@ -245,7 +442,183 @@ exports.createDonHang = async (req, res) => {
             connection.release();
         }
 
-        res.status(500).json({ error: 'Lỗi server khi tạo đơn hàng' });
+        res.status(500).json({ 
+            error: 'Lỗi server khi tạo đơn hàng',
+            details: error.message 
+        });
+    }
+};
+
+// Gửi email hóa đơn cho đơn hàng đã tạo
+exports.sendOrderInvoiceEmail = async (req, res) => {
+    try {
+        const { orderId, customerEmail } = req.body;
+        
+        if (!orderId || !customerEmail) {
+            return res.status(400).json({
+                success: false,
+                message: 'OrderId và customerEmail là bắt buộc'
+            });
+        }
+
+        console.log('=== SEND INVOICE EMAIL DEBUG ===');
+        console.log('Order ID:', orderId);
+        console.log('Customer Email:', customerEmail);
+        console.log('================================');
+
+        // Lấy thông tin đơn hàng từ database
+        const orderRowsResult = await db.query(
+            `SELECT dh.*, nd.HoTen, nd.SoDienThoai, nd.DiaChi, nd.Email as UserEmail,
+                    ct.*, sp.TenSanPham, sp.HinhAnh, sp.GiaGoc,
+                    km.MaKhuyenMai, km.MoTa as KhuyenMaiMoTa, km.PhanTramGiam
+             FROM DonHang dh
+             LEFT JOIN NguoiDung nd ON dh.KhachHangID = nd.UserID
+             LEFT JOIN ChiTietDonHang ct ON dh.DonHangID = ct.DonHangID
+             LEFT JOIN SanPham sp ON ct.SanPhamID = sp.SanPhamID
+             LEFT JOIN KhuyenMai km ON dh.KhuyenMaiID = km.KhuyenMaiID
+             WHERE dh.DonHangID = ?
+             ORDER BY ct.ChiTietID`,
+            [orderId]
+        );
+        
+        // Xử lý kết quả query đúng cách - orderRowsResult là array của rows
+        const orderRows = orderRowsResult;
+
+        if (orderRows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy đơn hàng'
+            });
+        }
+
+        // Debug: Log dữ liệu từ database
+        console.log('=== DATABASE DEBUG ===');
+        console.log('Total rows:', orderRows.length);
+        console.log('First row:', JSON.stringify(orderRows[0], null, 2));
+        console.log('Gia from ChiTietDonHang:', orderRows[0].Gia);
+        console.log('GiaGoc from SanPham:', orderRows[0].GiaGoc);
+        console.log('GiamGia from DonHang:', orderRows[0].GiamGia);
+        console.log('TongTien from DonHang:', orderRows[0].TongTien);
+        console.log('PhanTramGiam from KhuyenMai:', orderRows[0].PhanTramGiam);
+        console.log('MaKhuyenMai:', orderRows[0].MaKhuyenMai);
+        
+        // Debug từng row trong orderRows
+        orderRows.forEach((row, index) => {
+            console.log(`Row ${index}:`, {
+                TenSanPham: row.TenSanPham,
+                SoLuong: row.SoLuong,
+                Gia: row.Gia,
+                GiaGoc: row.GiaGoc,
+                ChiTietID: row.ChiTietID,
+                SanPhamID: row.SanPhamID
+            });
+        });
+        console.log('=====================');
+
+        // Tính toán giảm giá từ bảng KhuyenMai nếu có
+        let calculatedDiscount = 0;
+        if (orderRows[0].PhanTramGiam && orderRows[0].PhanTramGiam > 0) {
+            const phanTramGiam = parseFloat(orderRows[0].PhanTramGiam);
+            const tongTien = orderRows[0].TongTien || 0;
+            calculatedDiscount = Math.round((tongTien * phanTramGiam) / 100);
+            console.log('Calculated discount from KhuyenMai:', calculatedDiscount);
+        }
+
+        // Lấy giảm giá: Ưu tiên GiamGia từ DonHang, fallback về calculatedDiscount
+        const finalDiscount = orderRows[0].GiamGia || calculatedDiscount || 0;
+        console.log('Final discount:', finalDiscount);
+
+        // Ưu tiên thông tin từ request nếu có, fallback về database
+        const orderData = {
+            DonHangID: orderRows[0].DonHangID,
+            maDonHang: `DH${orderRows[0].DonHangID}`,
+            hoTen: req.body.hoTen || orderRows[0].HoTen || 'Khách hàng',
+            soDienThoai: req.body.soDienThoai || orderRows[0].SoDienThoai || 'N/A',
+            diaChi: req.body.diaChi || orderRows[0].DiaChi || 'N/A',
+            email: customerEmail,
+            tongTien: orderRows[0].TongTien || 0,
+            phiVanChuyen: 0, // Miễn phí vận chuyển
+            giaTriKhuyenMai: finalDiscount,
+            GiamGia: finalDiscount,
+            ngayDat: orderRows[0].NgayDat,
+            phuongThucThanhToan: orderRows[0].PhuongThucThanhToan || 'COD',
+            chiTiet: orderRows.map(row => {
+                // Ưu tiên lấy Gia từ ChiTietDonHang (giá thực tế khách hàng đã mua)
+                const donGia = row.Gia || 0;
+                const soLuong = row.SoLuong || 1;
+                const thanhTien = soLuong * donGia;
+                
+                console.log('Mapping chi tiet:', {
+                    tenSanPham: row.TenSanPham,
+                    soLuong: soLuong,
+                    donGia: donGia,
+                    thanhTien: thanhTien
+                });
+                
+                return {
+                    tenSanPham: row.TenSanPham || 'Sản phẩm',
+                    soLuong: soLuong,
+                    donGia: donGia,
+                    Gia: donGia,
+                    thanhTien: thanhTien
+                };
+            })
+        };
+        
+        console.log('Final orderData:', JSON.stringify(orderData, null, 2));
+
+        // Determine payment method display text and status
+        let paymentMethod = 'Thanh toán khi nhận hàng (COD)';
+        let paymentStatus = 'Chưa thanh toán';
+        let isPaid = false;
+        
+        if (orderRows[0].PhuongThucThanhToan === 'CARD') {
+            paymentMethod = 'Thanh toán bằng thẻ';
+            paymentStatus = 'Thành công';
+            isPaid = true;
+        } else if (orderRows[0].PhuongThucThanhToan === 'QR') {
+            paymentMethod = 'Chuyển khoản ngân hàng - VietQR';
+            paymentStatus = 'Chờ thanh toán';
+        } else if (orderRows[0].PhuongThucThanhToan === 'MOMO') {
+            paymentMethod = 'Ví điện tử MoMo';
+            paymentStatus = 'Thành công';
+            isPaid = true;
+        }
+        
+        const paymentData = {
+            method: paymentMethod,
+            status: paymentStatus,
+            isPaid: isPaid,
+            transactionRef: `${orderRows[0].PhuongThucThanhToan}_${orderId}`,
+            cardInfo: orderRows[0].PhuongThucThanhToan === 'CARD' ? {
+                type: 'Card',
+                last4: '****'
+            } : null
+        };
+
+        // Gửi email hóa đơn
+        console.log('Sending invoice email to:', customerEmail);
+        const emailResult = await emailService.sendInvoiceEmail(
+            orderData, 
+            paymentData,
+            customerEmail
+        );
+        
+        console.log('Invoice email result:', emailResult);
+
+        res.json({
+            success: true,
+            message: 'Email hóa đơn đã được gửi thành công',
+            emailResult: emailResult
+        });
+
+    } catch (error) {
+        console.error('Error sending invoice email:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi gửi email hóa đơn',
+            error: error.message
+        });
     }
 };
 

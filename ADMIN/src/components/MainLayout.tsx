@@ -15,6 +15,8 @@ import {
   MenuUnfoldOutlined,
   ThunderboltOutlined,
   SettingOutlined,
+  BarChartOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -39,6 +41,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <DashboardOutlined />,
       label: 'Dashboard',
       onClick: () => navigate('/'),
+    },
+    {
+      key: '/statistics',
+      icon: <BarChartOutlined />,
+      label: 'Thống kê',
+      onClick: () => navigate('/statistics'),
     },
     {
       key: '/users',
@@ -69,6 +77,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <FileTextOutlined />,
       label: 'Đơn hàng',
       onClick: () => navigate('/orders'),
+    },
+    {
+      key: '/payments',
+      icon: <DollarOutlined />,
+      label: 'Thanh toán',
+      onClick: () => navigate('/payments'),
     },
     {
       key: '/warranties',

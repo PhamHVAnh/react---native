@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const baoHanhController = require('../controllers/baoHanhController');
+const { default: warrantyRateLimit, clearAllRateLimits } = require('../middleware/warrantyRateLimit');
 
 /**
  * @swagger
@@ -163,7 +164,8 @@ router.delete('/:id', baoHanhController.deleteBaoHanh);
  *       500:
  *         description: Server error
  */
-router.get('/lookup/customer', baoHanhController.getBaoHanhByCustomer);
+router.get('/test', baoHanhController.testWarrantyData);
+router.get('/lookup/customer', warrantyRateLimit, baoHanhController.getBaoHanhByCustomer);
 
 /**
  * @swagger
@@ -201,7 +203,7 @@ router.get('/lookup/customer', baoHanhController.getBaoHanhByCustomer);
  *       500:
  *         description: Server error
  */
-router.get('/lookup/product', baoHanhController.getBaoHanhByProduct);
+router.get('/lookup/product', warrantyRateLimit, baoHanhController.getBaoHanhByProduct);
 
 /**
  * @swagger
@@ -400,5 +402,15 @@ router.get('/quick-lookup', baoHanhController.quickLookupByOrder);
  *         description: Server error
  */
 router.post('/create-from-order', baoHanhController.createWarrantyForOrderItem);
+
+// Reset rate limit endpoint (for development)
+router.post('/reset-rate-limit', (req, res) => {
+  try {
+    clearAllRateLimits();
+    res.json({ message: 'Rate limit đã được reset' });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi khi reset rate limit' });
+  }
+});
 
 module.exports = router;

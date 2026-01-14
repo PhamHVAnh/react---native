@@ -1,32 +1,82 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Select, message, Tag, Descriptions, Popconfirm, Image } from 'antd';
-import { EyeOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Modal, Select, message, Tag, Descriptions, Popconfirm, Image, Tooltip } from 'antd';
+import { CreditCardOutlined, QrcodeOutlined, BankOutlined } from '@ant-design/icons';
+import { EyeOutlined, DeleteOutlined, PrinterOutlined, DollarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { orderService } from '../services/orderService';
 import type { Order } from '../services/orderService';
 import dayjs from 'dayjs';
 import { formatPrice } from '../utils/priceFormatter';
 import SearchBar from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
+import { getImageUrl } from '../utils/imageUtils';
 
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const [paymentStatusesLoading, setPaymentStatusesLoading] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [currentFilters, setCurrentFilters] = useState<Record<string, unknown>>({});
+  const [paymentStatuses, setPaymentStatuses] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const navigate = useNavigate();
 
   // Use search hook
   const { searchLoading, searchOrders } = useSearch();
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadPaymentStatuses = async (orderIds: string[]) => {
+    if (orderIds.length === 0) return;
+
+    setPaymentStatusesLoading(true);
+    try {
+      console.log('=== LOADING PAYMENT STATUSES ===');
+      console.log('Order IDs:', orderIds);
+
+      // Call the new batch API
+      const response = await fetch('http://localhost:3000/api/payment/orders-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderIds }),
+      });
+
+      const data = await response.json();
+      console.log('Payment statuses response:', data);
+
+      if (data.success && data.data) {
+        const statusMap: Record<string, string> = {};
+        Object.keys(data.data).forEach(orderId => {
+          statusMap[orderId] = data.data[orderId].status;
+        });
+
+        console.log('Final payment statuses map:', statusMap);
+        setPaymentStatuses(statusMap);
+      } else {
+        console.error('Failed to load payment statuses:', data.message);
+      }
+    } catch (error) {
+      console.error('Error loading payment statuses:', error);
+    } finally {
+      setPaymentStatusesLoading(false);
+    }
+  };
 
   const loadOrders = async () => {
     setLoading(true);
     try {
       const response = await orderService.getAll();
       setOrders(response.data);
+
+      // Load payment statuses for all orders
+      const orderIds = response.data.map((order: Order) => order.DonHangID);
+      await loadPaymentStatuses(orderIds);
     } catch {
       message.error('Không thể tải danh sách đơn hàng');
     } finally {
@@ -58,6 +108,10 @@ const Orders: React.FC = () => {
       });
 
       setOrders(filteredOrders as unknown as Order[]);
+
+      // Load payment statuses for filtered orders
+      const orderIds = filteredOrders.map((order: Record<string, unknown>) => order.DonHangID as string);
+      await loadPaymentStatuses(orderIds);
     } catch (error) {
       message.error('Không thể tìm kiếm đơn hàng');
       console.error('Search error:', error);
@@ -89,6 +143,34 @@ const Orders: React.FC = () => {
     }
   };
 
+  const handlePrintInvoice = async (orderId: string) => {
+    try {
+      // Download PDF directly
+      const pdfUrl = `http://localhost:3000/api/donhang/${orderId}/invoice.pdf`;
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `hoa-don-${orderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success('Đang tải hóa đơn PDF...');
+    } catch (error) {
+      message.error('Không thể tạo hóa đơn PDF');
+      console.error('Print invoice error:', error);
+    }
+  };
+
+  const handleCheckPaymentStatus = async (orderId: string) => {
+    try {
+      // Luôn chuyển sang trang Payments, ngay cả khi không có thông tin thanh toán
+      navigate(`/payments?orderId=${orderId}&showInvoice=true`);
+      message.success('Đang chuyển đến trang thanh toán...');
+    } catch (error) {
+      console.error('Error navigating to payments:', error);
+      message.error('Không thể chuyển đến trang thanh toán');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const statusMap: Record<string, string> = {
       ChuaXuLy: 'orange',
@@ -109,13 +191,182 @@ const Orders: React.FC = () => {
     return statusMap[status] || status;
   };
 
+  const getPaymentMethodAndStatusDisplay = (order: Order) => {
+    const paymentMethod = order.PhuongThucThanhToan;
+    const orderStatus = order.TrangThai;
+    const actualPaymentStatus = paymentStatuses[order.DonHangID];
+
+    const getPaymentMethodIcon = (method: string) => {
+      const iconMap: Record<string, React.ReactNode> = {
+        'COD': <DollarOutlined style={{ fontSize: '16px' }} />,
+        'QR': <QrcodeOutlined style={{ fontSize: '16px' }} />,
+        'CARD': <CreditCardOutlined style={{ fontSize: '16px' }} />,
+        'MOMO': <BankOutlined style={{ fontSize: '16px' }} />,
+        'ViDienTu': <BankOutlined style={{ fontSize: '16px' }} />,
+        'TheNganHang': <CreditCardOutlined style={{ fontSize: '16px' }} />,
+        'CARD_PAYMENT': <CreditCardOutlined style={{ fontSize: '16px' }} />,
+        'VIETQR': <QrcodeOutlined style={{ fontSize: '16px' }} />
+      };
+      return iconMap[method] || <DollarOutlined style={{ fontSize: '16px' }} />;
+    };
+
+    // Show loading state if payment statuses are still loading
+    if (paymentStatusesLoading && paymentMethod !== 'COD') {
+      return (
+        <Tooltip title="Đang tải thông tin thanh toán...">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {getPaymentMethodIcon(paymentMethod)}
+            <Tag color="default" icon={<ClockCircleOutlined />} style={{ margin: 0, fontSize: '11px' }}>
+              Đang tải...
+            </Tag>
+          </div>
+        </Tooltip>
+      );
+    }
+
+    console.log('=== PAYMENT STATUS DISPLAY DEBUG ===');
+    console.log('Order ID:', order.DonHangID);
+    console.log('Payment method:', paymentMethod, 'Type:', typeof paymentMethod);
+    console.log('Order status:', orderStatus);
+    console.log('Actual payment status:', actualPaymentStatus, 'Type:', typeof actualPaymentStatus);
+    console.log('Is MOMO?', paymentMethod === 'MOMO');
+    console.log('Is PENDING?', actualPaymentStatus === 'PENDING');
+
+    if (paymentMethod === 'COD') {
+      // COD: Chỉ thanh toán khi đơn hàng hoàn thành
+      const isPaid = orderStatus === 'HoanThanh';
+      const statusText = isPaid ? 'Đã thanh toán' : 'Chưa thanh toán';
+
+      return (
+        <Tooltip title={`COD - ${statusText}`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {getPaymentMethodIcon(paymentMethod)}
+            <Tag
+              color={isPaid ? "green" : "orange"}
+              icon={isPaid ? <CheckCircleOutlined /> : <ClockCircleOutlined />}
+              style={{ margin: 0, fontSize: '11px' }}
+            >
+              {statusText}
+            </Tag>
+          </div>
+        </Tooltip>
+      );
+    } else {
+      // Các phương thức khác: Lấy trạng thái thực tế từ PaymentTransactions
+      const statusMap: Record<string, {
+        color: string;
+        icon: React.ReactNode;
+        text: string;
+      }> = {
+        'SUCCESS': {
+          color: 'green',
+          icon: <CheckCircleOutlined />,
+          text: 'Thành công'
+        },
+        'PENDING': {
+          color: 'orange',
+          icon: <ClockCircleOutlined />,
+          text: 'Chưa xử lý'
+        },
+        'FAILED': {
+          color: 'red',
+          icon: <CloseCircleOutlined />,
+          text: 'Thất bại'
+        },
+        'CANCELLED': {
+          color: 'gray',
+          icon: <CloseCircleOutlined />,
+          text: 'Đã hủy'
+        },
+        'NO_PAYMENT_RECORD': {
+          color: 'purple',
+          icon: <ClockCircleOutlined />,
+          text: 'Chưa có thanh toán'
+        },
+        'ERROR': {
+          color: 'red',
+          icon: <CloseCircleOutlined />,
+          text: 'Lỗi tải dữ liệu'
+        },
+      };
+
+      const methodTextMap: Record<string, string> = {
+        'QR': 'QR Code ngân hàng',
+        'CARD': 'Thanh toán bằng thẻ',
+        'MOMO': 'Ví điện tử MoMo',
+        'ViDienTu': 'Ví điện tử',
+        'TheNganHang': 'Thẻ ngân hàng',
+        'CARD_PAYMENT': 'Thanh toán bằng thẻ',
+        'VIETQR': 'QR Code ngân hàng'
+      };
+      const methodText = methodTextMap[paymentMethod] || paymentMethod;
+
+      let statusInfo;
+      // Nếu là MOMO và PENDING, hiển thị SUCCESS (vì user đã thanh toán)
+      let effectiveStatus = actualPaymentStatus;
+
+      // MOMO: Nếu có bất kỳ payment record nào (kể cả PENDING), coi như đã thanh toán
+      if (paymentMethod === 'MOMO') {
+        console.log('🔍 MOMO Payment detected!');
+        console.log('   - actualPaymentStatus:', actualPaymentStatus);
+        console.log('   - Will treat as SUCCESS');
+
+        // Nếu là PENDING hoặc không có status (undefined/null), coi như SUCCESS
+        if (!actualPaymentStatus || actualPaymentStatus === 'PENDING') {
+          effectiveStatus = 'SUCCESS';
+          console.log('   ✅ Changed to SUCCESS');
+        }
+      }
+
+      if (effectiveStatus && statusMap[effectiveStatus]) {
+        statusInfo = statusMap[effectiveStatus];
+        console.log('Using actual payment status:', effectiveStatus, statusInfo);
+      } else {
+        // Fallback nếu không có thông tin thanh toán
+        console.log('Using fallback status');
+        statusInfo = {
+          color: 'blue',
+          icon: <DollarOutlined />,
+          text: 'Đã thanh toán'
+        };
+      }
+
+      const tooltipText = `${methodText} - ${statusInfo.text}`;
+
+      return (
+        <Tooltip title={tooltipText}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {getPaymentMethodIcon(paymentMethod)}
+            <Tag
+              color={statusInfo.color}
+              icon={statusInfo.icon}
+              style={{ margin: 0, fontSize: '11px' }}
+            >
+              {statusInfo.text}
+            </Tag>
+          </div>
+        </Tooltip>
+      );
+    }
+  };
+
   const columns = [
     {
-      title: 'Mã đơn hàng',
-      dataIndex: 'DonHangID',
-      key: 'DonHangID',
-      render: (text: string) => text.substring(0, 8) + '...',
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
     },
+    // Ẩn cột Mã đơn hàng
+    // {
+    //   title: 'Mã đơn hàng',
+    //   dataIndex: 'DonHangID',
+    //   key: 'DonHangID',
+    //   render: (text: string) => text.substring(0, 8) + '...',
+    // },
     {
       title: 'Khách hàng',
       dataIndex: 'HoTen',
@@ -151,11 +402,6 @@ const Orders: React.FC = () => {
       render: (value: number) => <strong>{formatPrice(value)}</strong>,
     },
     {
-      title: 'Thanh toán',
-      dataIndex: 'PhuongThucThanhToan',
-      key: 'PhuongThucThanhToan',
-    },
-    {
       title: 'Trạng thái',
       dataIndex: 'TrangThai',
       key: 'TrangThai',
@@ -181,6 +427,13 @@ const Orders: React.FC = () => {
       ),
     },
     {
+      title: 'Thanh toán',
+      key: 'paymentMethodAndStatus',
+      render: (_: unknown, record: Order) => {
+        return getPaymentMethodAndStatusDisplay(record);
+      },
+    },
+    {
       title: 'Hành động',
       key: 'action',
       render: (_: unknown, record: Order) => (
@@ -189,6 +442,19 @@ const Orders: React.FC = () => {
             type="link"
             icon={<EyeOutlined />}
             onClick={() => handleViewDetail(record.DonHangID)}
+            title="Xem chi tiết"
+          />
+          <Button
+            type="link"
+            icon={<DollarOutlined />}
+            onClick={() => handleCheckPaymentStatus(record.DonHangID)}
+            title="Kiểm tra trạng thái thanh toán"
+          />
+          <Button
+            type="link"
+            icon={<PrinterOutlined />}
+            onClick={() => handlePrintInvoice(record.DonHangID)}
+            title="In hóa đơn"
           />
           <Popconfirm
             title="Bạn có chắc chắn muốn xóa đơn hàng này?"
@@ -201,6 +467,7 @@ const Orders: React.FC = () => {
               type="link"
               danger
               icon={<DeleteOutlined />}
+              title="Xóa đơn hàng"
             />
           </Popconfirm>
         </Space>
@@ -220,12 +487,12 @@ const Orders: React.FC = () => {
         searchType="orders"
         loading={searchLoading}
       />
-      
+
       {Object.keys(currentFilters).length > 0 && (
-        <div style={{ 
-          marginBottom: 16, 
-          padding: '12px 16px', 
-          background: '#e6f7ff', 
+        <div style={{
+          marginBottom: 16,
+          padding: '12px 16px',
+          background: '#e6f7ff',
           border: '1px solid #91d5ff',
           borderRadius: '6px'
         }}>
@@ -247,6 +514,16 @@ const Orders: React.FC = () => {
         rowKey="DonHangID"
         loading={loading}
         scroll={{ x: 1200 }}
+        pagination={{
+          current: currentPage,
+          pageSize: pageSize,
+          showSizeChanger: true,
+          showTotal: (total) => `Tổng ${total} đơn hàng`,
+          onChange: (page, size) => {
+            setCurrentPage(page);
+            setPageSize(size || 10);
+          },
+        }}
       />
 
       <Modal
@@ -259,7 +536,7 @@ const Orders: React.FC = () => {
         {selectedOrder && (
           <div>
             <Descriptions bordered column={2}>
-              <Descriptions.Item label="Mã đơn hàng" span={2}>
+              <Descriptions.Item label="Stt" span={2}>
                 {selectedOrder.DonHangID}
               </Descriptions.Item>
               <Descriptions.Item label="Khách hàng">
@@ -306,7 +583,7 @@ const Orders: React.FC = () => {
                   width: 80,
                   render: (hinhAnh: string) => (
                     <Image
-                      src={hinhAnh ? `http://localhost:3000${hinhAnh}` : undefined}
+                      src={getImageUrl(hinhAnh)}
                       alt="Sản phẩm"
                       width={50}
                       height={50}

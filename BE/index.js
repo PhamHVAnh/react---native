@@ -17,6 +17,10 @@ const tonKhoRouter = require("./routes/tonKho");
 const uploadRouter = require("./routes/upload");
 const gioHangRouter = require("./routes/gioHang"); // Added
 const wishlistRouter = require("./routes/wishlist");
+const thongKeRouter = require("./routes/thongKe"); // Added
+const paymentRouter = require("./routes/payment"); // Added
+const emailRouter = require("./routes/email"); // Added
+const chatRouter = require("./routes/chat"); // Added
 // Search router removed - functionality moved to client-side
 
 const app = express();
@@ -24,8 +28,9 @@ const app = express();
 // Enable CORS for all origins
 app.use(cors());
 
-// Body parser
-app.use(bodyParser.json());
+// Body parser with increased limit for large payloads (like base64 QR codes)
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files from the 'uploads' directory
 app.use("/uploads", express.static("uploads"));
@@ -210,6 +215,10 @@ app.use("/api/tonkho", tonKhoRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/giohang", gioHangRouter); // Added
 app.use("/api/wishlist", wishlistRouter);
+app.use("/api/thongke", thongKeRouter); // Added
+app.use("/api/payment", paymentRouter); // Added
+app.use("/api/email", emailRouter); // Added
+app.use("/api/chat", chatRouter); // Added
 // Search API removed - functionality moved to client-side
 
 const PORT = process.env.PORT || 3000;

@@ -16,6 +16,8 @@ import Promotions from './pages/Promotions';
 import Orders from './pages/Orders';
 import Warranties from './pages/Warranties';
 import Inventory from './pages/Inventory';
+import Statistics from './pages/Statistics';
+import Payments from './pages/Payments';
 import './App.css';
 
 const App: React.FC = () => {
@@ -33,6 +35,7 @@ const App: React.FC = () => {
                     <MainLayout>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
+                        <Route path="/statistics" element={<Statistics />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/users" element={<Users />} />
                         <Route path="/categories" element={<Categories />} />
@@ -41,6 +44,7 @@ const App: React.FC = () => {
                         <Route path="/products/edit/:id" element={<ProductForm />} />
                         <Route path="/promotions" element={<Promotions />} />
                         <Route path="/orders" element={<Orders />} />
+                        <Route path="/payments" element={<Payments />} />
                         <Route path="/warranties" element={<Warranties />} />
                         <Route path="/inventory" element={<Inventory />} />
                         <Route path="*" element={<Navigate to="/" replace />} />

@@ -5,8 +5,8 @@ require('dotenv').config();
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'electro_store',
+    password: process.env.DB_PASSWORD || '12345678',
+    database: process.env.DB_NAME || 'quanlydienmay',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -23,7 +23,7 @@ const pool = mysql.createPool({
 pool.getConnection((err, connection) => {
     if (err) {
         console.error('Database connection failed:', err);
-        console.log('Make sure MySQL is running and database "electro_store" exists');
+        console.log('Make sure MySQL is running and database "quanlydienmay" exists');
     } else {
         console.log('Connected to MySQL successfully with connection pool');
         connection.release();

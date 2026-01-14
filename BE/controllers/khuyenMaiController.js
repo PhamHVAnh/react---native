@@ -49,37 +49,64 @@ exports.getKhuyenMaiById = async (req, res) => {
     }
 };
 
-exports.createKhuyenMai = (req, res) => {
-    const khuyenMaiId = uuidv4(); // Generate UUID for KhuyenMaiID
-    let promotionData = req.body;
-    if (Array.isArray(promotionData) && promotionData.length > 0) {
-        promotionData = promotionData[0];
-    }
-    const newKhuyenMai = { KhuyenMaiID: khuyenMaiId, ...promotionData }; // Add KhuyenMaiID to the body
-    db.connection.query('INSERT INTO KhuyenMai SET ?', newKhuyenMai, (err, results) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).send(err);
+exports.createKhuyenMai = async (req, res) => {
+    try {
+        console.log('➕ Creating new promotion with data:', req.body);
+        
+        const khuyenMaiId = uuidv4(); // Generate UUID for KhuyenMaiID
+        let promotionData = req.body;
+        if (Array.isArray(promotionData) && promotionData.length > 0) {
+            promotionData = promotionData[0];
         }
+        const newKhuyenMai = { KhuyenMaiID: khuyenMaiId, ...promotionData }; // Add KhuyenMaiID to the body
+        
+        await db.query('INSERT INTO KhuyenMai SET ?', newKhuyenMai);
+        
+        console.log('✅ Promotion created successfully:', khuyenMaiId);
         res.status(201).json({ KhuyenMaiID: khuyenMaiId, ...newKhuyenMai }); // Return generated KhuyenMaiID
-    });
+    } catch (error) {
+        console.error('❌ Database error creating promotion:', error);
+        res.status(500).json({ error: error.message });
+    }
 };
 
 
-exports.updateKhuyenMai = (req, res) => {
-    db.connection.query('UPDATE KhuyenMai SET ? WHERE KhuyenMaiID = ?', [req.body, req.params.id], (err, results) => {
-        if (err) res.status(500).send(err);
-        else if (results.affectedRows === 0) res.status(404).send('KhuyenMai not found');
-        else res.json({ KhuyenMaiID: req.params.id, ...req.body });
-    });
+exports.updateKhuyenMai = async (req, res) => {
+    try {
+        console.log('🔄 Updating promotion:', req.params.id, 'with data:', req.body);
+        
+        const results = await db.query('UPDATE KhuyenMai SET ? WHERE KhuyenMaiID = ?', [req.body, req.params.id]);
+        
+        if (results.affectedRows === 0) {
+            console.log('⚠️ Promotion not found:', req.params.id);
+            return res.status(404).json({ error: 'KhuyenMai not found' });
+        }
+        
+        console.log('✅ Promotion updated successfully');
+        res.json({ KhuyenMaiID: req.params.id, ...req.body });
+    } catch (error) {
+        console.error('❌ Database error updating promotion:', error);
+        res.status(500).json({ error: error.message });
+    }
 };
 
-exports.deleteKhuyenMai = (req, res) => {
-    db.connection.query('DELETE FROM KhuyenMai WHERE KhuyenMaiID = ?', [req.params.id], (err, results) => {
-        if (err) res.status(500).send(err);
-        else if (results.affectedRows === 0) res.status(404).send('KhuyenMai not found');
-        else res.status(204).send();
-    });
+exports.deleteKhuyenMai = async (req, res) => {
+    try {
+        console.log('🗑️ Deleting promotion:', req.params.id);
+        
+        const results = await db.query('DELETE FROM KhuyenMai WHERE KhuyenMaiID = ?', [req.params.id]);
+        
+        if (results.affectedRows === 0) {
+            console.log('⚠️ Promotion not found:', req.params.id);
+            return res.status(404).json({ error: 'KhuyenMai not found' });
+        }
+        
+        console.log('✅ Promotion deleted successfully');
+        res.status(204).send();
+    } catch (error) {
+        console.error('❌ Database error deleting promotion:', error);
+        res.status(500).json({ error: error.message });
+    }N
 };
 
 // Lấy khuyến mãi theo mã
@@ -127,18 +154,16 @@ exports.validatePromotion = (req, res) => {
         AND (GioiHanSuDung > 0 OR GioiHanSuDung IS NULL)
     `;
     
-    db.connection.query(query, [code, currentDate, currentDate], (err, results) => {
-        if (err) {
-            res.status(500).json({ 
-                isValid: false, 
-                message: 'Lỗi khi kiểm tra mã khuyến mãi' 
-            });
-        } else {
-            res.json({ 
-                isValid: results.length > 0,
-                message: results.length > 0 ? 'Mã khuyến mãi hợp lệ' : 'Mã khuyến mãi không hợp lệ'
-            });
-        }
+    db.query(query, [code, currentDate, currentDate]).then(results => {
+        res.json({ 
+            isValid: results.length > 0,
+            message: results.length > 0 ? 'Mã khuyến mãi hợp lệ' : 'Mã khuyến mãi không hợp lệ'
+        });
+    }).catch(err => {
+        res.status(500).json({ 
+            isValid: false, 
+            message: 'Lỗi khi kiểm tra mã khuyến mãi' 
+        });
     });
 };
 
@@ -163,15 +188,7 @@ exports.applyPromotion = (req, res) => {
         AND (GioiHanSuDung > 0 OR GioiHanSuDung IS NULL)
     `;
     
-    db.connection.query(query, [maKhuyenMai, currentDate, currentDate], (err, results) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                message: 'Lỗi khi kiểm tra mã khuyến mãi',
-                error: err.message
-            });
-        }
-        
+    db.query(query, [maKhuyenMai, currentDate, currentDate]).then(results => {
         if (results.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -196,6 +213,12 @@ exports.applyPromotion = (req, res) => {
                 tongTienSauGiam: tongTienSauGiam
             },
             message: `Áp dụng mã khuyến mãi thành công! Giảm ${soTienGiam.toLocaleString('vi-VN')}₫`
+        });
+    }).catch(err => {
+        return res.status(500).json({
+            success: false,
+            message: 'Lỗi khi kiểm tra mã khuyến mãi',
+            error: err.message
         });
     });
 };

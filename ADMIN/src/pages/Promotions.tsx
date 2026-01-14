@@ -15,6 +15,8 @@ const Promotions: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [, setCurrentFilters] = useState<Record<string, unknown>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
 
   // Use search hook
@@ -62,12 +64,14 @@ const Promotions: React.FC = () => {
   };
 
   const handleAdd = () => {
+    console.log('➕ Opening add promotion modal');
     setEditingPromotion(null);
     form.resetFields();
     setModalVisible(true);
   };
 
   const handleEdit = (record: Promotion) => {
+    console.log('✏️ Opening edit promotion modal for:', record);
     setEditingPromotion(record);
     form.setFieldsValue({
       ...record,
@@ -89,6 +93,8 @@ const Promotions: React.FC = () => {
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     try {
+      console.log('📝 Form values:', values);
+
       const promotionData: CreatePromotionDto = {
         MaKhuyenMai: values.MaKhuyenMai as string,
         MoTa: values.MoTa as string,
@@ -99,16 +105,21 @@ const Promotions: React.FC = () => {
         NgayKetThuc: (values.NgayKetThuc as { format: (format: string) => string }).format('YYYY-MM-DD'),
       };
 
+      console.log('📤 Promotion data to send:', promotionData);
+
       if (editingPromotion) {
+        console.log('🔄 Updating promotion:', editingPromotion.KhuyenMaiID);
         await promotionService.update(editingPromotion.KhuyenMaiID, promotionData);
         message.success('Cập nhật khuyến mãi thành công');
       } else {
+        console.log('➕ Creating new promotion');
         await promotionService.create(promotionData);
         message.success('Thêm khuyến mãi thành công');
       }
       setModalVisible(false);
       loadPromotions();
-    } catch {
+    } catch (error) {
+      console.error('❌ Error in handleSubmit:', error);
       message.error(editingPromotion ? 'Không thể cập nhật khuyến mãi' : 'Không thể thêm khuyến mãi');
     }
   };
@@ -121,6 +132,15 @@ const Promotions: React.FC = () => {
   };
 
   const columns = [
+    {
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
+    },
     {
       title: 'Mã khuyến mãi',
       dataIndex: 'MaKhuyenMai',
@@ -165,7 +185,7 @@ const Promotions: React.FC = () => {
       title: 'Trạng thái',
       key: 'status',
       render: (_: unknown, record: Promotion) => (
-        isActive(record) 
+        isActive(record)
           ? <Tag color="green">Đang hoạt động</Tag>
           : <Tag color="red">Không hoạt động</Tag>
       ),
@@ -218,9 +238,9 @@ const Promotions: React.FC = () => {
               <ThunderboltOutlined style={{ color: '#004d99', fontSize: 16 }} />
               <span style={{ fontSize: 18, fontWeight: '600' }}>Danh sách khuyến mãi</span>
             </div>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
               onClick={handleAdd}
               style={{
                 background: '#004d99',
@@ -250,10 +270,15 @@ const Promotions: React.FC = () => {
           loading={loading}
           scroll={{ x: 1000 }}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} khuyến mãi`,
             style: { marginTop: 24 },
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
           }}
           style={{
             borderRadius: '8px',
@@ -304,8 +329,8 @@ const Promotions: React.FC = () => {
             }
             rules={[{ required: true, message: 'Vui lòng nhập mã khuyến mãi' }]}
           >
-            <Input 
-              placeholder="SALE2024" 
+            <Input
+              placeholder="SALE2024"
               size="large"
               style={{ borderRadius: '8px' }}
             />
@@ -320,8 +345,8 @@ const Promotions: React.FC = () => {
             }
             rules={[{ required: true, message: 'Vui lòng nhập mô tả' }]}
           >
-            <Input.TextArea 
-              rows={3} 
+            <Input.TextArea
+              rows={3}
               placeholder="Mô tả chi tiết về chương trình khuyến mãi"
               style={{ borderRadius: '8px' }}
             />
@@ -338,9 +363,9 @@ const Promotions: React.FC = () => {
               rules={[{ required: true, message: 'Vui lòng nhập phần trăm giảm' }]}
               style={{ flex: 1 }}
             >
-              <InputNumber 
-                style={{ width: '100%' }} 
-                min={0} 
+              <InputNumber
+                style={{ width: '100%' }}
+                min={0}
                 max={100}
                 size="large"
                 placeholder="10"
@@ -358,8 +383,8 @@ const Promotions: React.FC = () => {
               rules={[{ required: true, message: 'Vui lòng nhập giới hạn sử dụng' }]}
               style={{ flex: 1 }}
             >
-              <InputNumber 
-                style={{ width: '100%' }} 
+              <InputNumber
+                style={{ width: '100%' }}
                 min={1}
                 size="large"
                 placeholder="100"
@@ -397,9 +422,9 @@ const Promotions: React.FC = () => {
               rules={[{ required: true, message: 'Vui lòng chọn ngày bắt đầu' }]}
               style={{ flex: 1 }}
             >
-              <DatePicker 
-                style={{ width: '100%' }} 
-                format="DD/MM/YYYY" 
+              <DatePicker
+                style={{ width: '100%' }}
+                format="DD/MM/YYYY"
                 size="large"
                 placeholder="Chọn ngày bắt đầu"
               />
@@ -415,9 +440,9 @@ const Promotions: React.FC = () => {
               rules={[{ required: true, message: 'Vui lòng chọn ngày kết thúc' }]}
               style={{ flex: 1 }}
             >
-              <DatePicker 
-                style={{ width: '100%' }} 
-                format="DD/MM/YYYY" 
+              <DatePicker
+                style={{ width: '100%' }}
+                format="DD/MM/YYYY"
                 size="large"
                 placeholder="Chọn ngày kết thúc"
               />

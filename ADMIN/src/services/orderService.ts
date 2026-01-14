@@ -17,7 +17,7 @@ export interface Order {
   TongTien: number;
   KhuyenMaiID?: string;
   GiamGia: number;
-  PhuongThucThanhToan: 'COD' | 'ViDienTu' | 'TheNganHang';
+  PhuongThucThanhToan: 'COD' | 'QR' | 'CARD' | 'MOMO' | 'ViDienTu' | 'TheNganHang' | 'CARD_PAYMENT' | 'VIETQR';
   ThanhTien: number;
   // Fields from JOIN with NguoiDung
   HoTen?: string;

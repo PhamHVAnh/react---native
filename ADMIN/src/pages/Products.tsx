@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Space, message, Popconfirm, Image, Tag, Tooltip, Card, Modal } from 'antd';
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
   InfoCircleOutlined,
   ShoppingOutlined,
   ThunderboltOutlined,
@@ -16,6 +16,7 @@ import type { Category } from '../services/categoryService';
 import { formatPrice } from '../utils/priceFormatter';
 import SearchBar from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
+import { getValidImageUrls } from '../utils/imageUtils';
 
 const Products: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,8 @@ const Products: React.FC = () => {
   const [selectedProductImages, setSelectedProductImages] = useState<string[]>([]);
   const [selectedProductName, setSelectedProductName] = useState<string>('');
   const [currentFilters, setCurrentFilters] = useState<Record<string, unknown>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Use search hook
   const { searchLoading, searchProducts } = useSearch();
@@ -80,7 +83,7 @@ const Products: React.FC = () => {
   };
 
   const handleViewImages = (images: string[], productName: string) => {
-    const validImages = images.filter(img => img && img.trim() !== '');
+    const validImages = getValidImageUrls(images);
     if (validImages.length === 0) {
       message.warning('Sản phẩm này chưa có ảnh nào');
       return;
@@ -130,36 +133,39 @@ const Products: React.FC = () => {
 
   const columns = [
     {
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
+    },
+    {
       title: 'Hình ảnh',
       dataIndex: 'HinhAnh',
       key: 'HinhAnh',
       width: 120,
       render: (images: string[], record: Product) => {
-        if (!Array.isArray(images) || images.length === 0) {
-          return <div style={{ textAlign: 'center', color: '#999' }}>Không có ảnh</div>;
-        }
-        
-        const validImages = images.filter(img => img && img.trim() !== '');
-        
+        const validImages = getValidImageUrls(images);
+
         if (validImages.length === 0) {
           return <div style={{ textAlign: 'center', color: '#999' }}>Không có ảnh</div>;
         }
-        
+
         const handleImageClick = () => {
           handleViewImages(images, record.TenSanPham);
         };
-        
-        const imageUrl = validImages[0].startsWith('http') 
-          ? validImages[0] 
-          : `http://localhost:3000${validImages[0]}`;
-        
+
+        const imageUrl = validImages[0];
+
         return (
           <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={handleImageClick}>
-            <Image 
-              src={imageUrl || undefined} 
-              width={80} 
-              height={60} 
-              style={{ objectFit: 'cover', borderRadius: 4 }} 
+            <Image
+              src={imageUrl || undefined}
+              width={80}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
               fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgeHANwDrkl1AuO+pmgAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAwqADAAQAAAABAAAAwwAAAAD9b/HnAAAHlklEQVR4Ae3dP3Ik1RnG4W+FgYxN..."
             />
             {validImages.length > 1 && (
@@ -216,11 +222,11 @@ const Products: React.FC = () => {
         const displayText = entries
           .map(([key, value]) => `${key}: ${value}`)
           .join(', ');
-        
+
         const hasMore = Object.keys(attributes).length > 3;
 
         return (
-          <Tooltip 
+          <Tooltip
             title={
               <div>
                 {Object.entries(attributes).map(([key, value]) => (
@@ -231,8 +237,8 @@ const Products: React.FC = () => {
               </div>
             }
           >
-            <div style={{ 
-              fontSize: 12, 
+            <div style={{
+              fontSize: 12,
               color: '#666',
               cursor: 'pointer',
               display: 'flex',
@@ -257,7 +263,9 @@ const Products: React.FC = () => {
       title: 'Giá bán',
       key: 'price',
       render: (_: unknown, record: Product) => {
-        const finalPrice = record.GiaGoc - (record.GiamGia || 0);
+        // GiamGia là phần trăm (0-100), tính giá cuối cùng
+        const discountPercent = record.GiamGia || 0;
+        const finalPrice = record.GiaGoc * (1 - discountPercent / 100);
         return (
           <div>
             <div style={{ fontWeight: 500, color: '#ff4d4f' }}>
@@ -266,6 +274,11 @@ const Products: React.FC = () => {
             {record.GiamGia > 0 && (
               <div style={{ fontSize: 12, textDecoration: 'line-through', color: '#999' }}>
                 {formatPrice(record.GiaGoc)}
+              </div>
+            )}
+            {record.GiamGia > 0 && (
+              <div style={{ fontSize: 11, color: '#52c41a', fontWeight: 500 }}>
+                -{discountPercent}%
               </div>
             )}
           </div>
@@ -278,6 +291,35 @@ const Products: React.FC = () => {
       key: 'BaoHanhThang',
       width: 100,
       render: (months: number) => `${months} tháng`,
+    },
+    {
+      title: 'Số lượng tồn kho',
+      dataIndex: 'SoLuongTon',
+      key: 'SoLuongTon',
+      width: 120,
+      sorter: (a: Product, b: Product) => (a.SoLuongTon || 0) - (b.SoLuongTon || 0),
+      render: (_: number, record: Product) => {
+        const stockQuantity = record.SoLuongTon || 0;
+        const isOutOfStock = stockQuantity <= 0;
+        return (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontWeight: 600,
+              color: isOutOfStock ? '#ff4d4f' : stockQuantity < 10 ? '#faad14' : '#52c41a',
+              fontSize: 14
+            }}>
+              {stockQuantity}
+            </div>
+            <div style={{
+              fontSize: 11,
+              color: isOutOfStock ? '#ff4d4f' : stockQuantity < 10 ? '#faad14' : '#52c41a',
+              fontWeight: 500
+            }}>
+              {isOutOfStock ? 'Hết hàng' : stockQuantity < 10 ? 'Sắp hết' : 'Còn hàng'}
+            </div>
+          </div>
+        );
+      },
     },
     {
       title: 'Hành động',
@@ -331,9 +373,9 @@ const Products: React.FC = () => {
               <ThunderboltOutlined style={{ color: '#004d99', fontSize: 16 }} />
               <span style={{ fontSize: 18, fontWeight: '600' }}>Danh sách sản phẩm</span>
             </div>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
               onClick={handleAdd}
               style={{
                 background: '#004d99',
@@ -357,12 +399,12 @@ const Products: React.FC = () => {
           categories={categories}
           brands={getUniqueBrands(products)}
         />
-        
+
         {Object.keys(currentFilters).length > 0 && (
-          <div style={{ 
-            marginBottom: 16, 
-            padding: '12px 16px', 
-            background: '#e6f7ff', 
+          <div style={{
+            marginBottom: 16,
+            padding: '12px 16px',
+            background: '#e6f7ff',
             border: '1px solid #91d5ff',
             borderRadius: '6px'
           }}>
@@ -377,7 +419,7 @@ const Products: React.FC = () => {
             </div>
           </div>
         )}
-        
+
         <Table
           columns={columns}
           dataSource={products}
@@ -385,10 +427,15 @@ const Products: React.FC = () => {
           loading={loading}
           scroll={{ x: 1200 }}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} sản phẩm`,
             style: { marginTop: 24 },
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
           }}
           style={{
             borderRadius: '8px',
@@ -416,9 +463,9 @@ const Products: React.FC = () => {
       >
         <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
           {selectedProductImages.length > 0 && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
               gap: 16,
               padding: 16
             }}>
@@ -434,7 +481,7 @@ const Products: React.FC = () => {
                     Ảnh {index + 1}
                   </div>
                   <Image
-                    src={imageUrl && imageUrl.startsWith('http') ? imageUrl : imageUrl ? `http://localhost:3000${imageUrl}` : undefined}
+                    src={imageUrl}
                     alt={`${selectedProductName} - Ảnh ${index + 1}`}
                     style={{
                       width: '100%',

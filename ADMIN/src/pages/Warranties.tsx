@@ -15,6 +15,8 @@ const Warranties: React.FC = () => {
   const [newStatus, setNewStatus] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [currentFilters, setCurrentFilters] = useState<Record<string, unknown>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Use search hook
   const { searchLoading, searchWarranties } = useSearch();
@@ -116,6 +118,15 @@ const Warranties: React.FC = () => {
   };
 
   const columns = [
+    {
+      title: 'STT',
+      key: 'stt',
+      width: 60,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => {
+        return (currentPage - 1) * pageSize + index + 1;
+      },
+    },
     {
       title: 'Mã bảo hành',
       dataIndex: 'BaoHanhID',
@@ -260,10 +271,15 @@ const Warranties: React.FC = () => {
           loading={loading}
           scroll={{ x: 1200 }}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} bảo hành`,
             style: { marginTop: 24 },
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
           }}
           style={{
             borderRadius: '8px',
